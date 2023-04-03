@@ -113,7 +113,7 @@ def _impl(array, allow_record, allow_other, regulararray):
         return ak.operations.from_arrow(array, highlevel=False)
 
     elif isinstance(array, (str, bytes)):
-        return ak.operations.from_iter([array], highlevel=False)[0]
+        return ak.operations.from_iter(array, highlevel=False)
 
     elif isinstance(array, Iterable):
         return _impl(

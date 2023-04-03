@@ -1,9 +1,12 @@
 # BSD 3-Clause License; see https://github.com/scikit-hep/awkward-1.0/blob/main/LICENSE
 __all__ = ("from_iter",)
 
+from collections.abc import Iterable
+
 from awkward_cpp.lib import _ext
 
 import awkward as ak
+from awkward._layout import wrap_layout
 from awkward._nplikes.numpylike import NumpyMetadata
 
 np = NumpyMetadata.instance()
@@ -72,6 +75,13 @@ def from_iter(
 
 
 def _impl(iterable, highlevel, behavior, allow_record, initial, resize):
+    if not isinstance(iterable, Iterable):
+        raise ak._errors.wrap_error(
+            TypeError(
+                f"cannot produce an array from a non-iterable object ({type(iterable)!r})"
+            )
+        )
+
     if isinstance(iterable, dict):
         if allow_record:
             return _impl(
@@ -89,6 +99,7 @@ def _impl(iterable, highlevel, behavior, allow_record, initial, resize):
                 )
             )
 
+    # Ensure that tuples are treated as iterables, not records
     if isinstance(iterable, tuple):
         iterable = list(iterable)
 
@@ -98,14 +109,16 @@ def _impl(iterable, highlevel, behavior, allow_record, initial, resize):
     formstr, length, buffers = builder.to_buffers()
     form = ak.forms.from_json(formstr)
 
-    return ak.operations.ak_from_buffers._impl(
+    outer = ak.operations.ak_from_buffers._impl(
         form,
         length,
         buffers,
         buffer_key="{form_key}-{attribute}",
         backend="cpu",
         byteorder=ak._util.native_byteorder,
-        highlevel=highlevel,
+        highlevel=False,
         behavior=behavior,
         simplify=True,
-    )[0]
+    )
+
+    return wrap_layout(outer[0], highlevel=highlevel, behavior=behavior)
